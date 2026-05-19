@@ -1,0 +1,105 @@
+---
+title: Configuration des webhooks
+description: Recevez des notifications en temps réel lorsqu'un paiement est complété ou annulé.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Présentation
+
+Les webhooks permettent à LawPay de notifier votre serveur en temps réel lorsqu'un événement se produit (paiement réussi, annulation, etc.). C'est le moyen le plus fiable de confirmer un paiement.
+
+<Aside type="caution">
+  Ne vous fiez pas uniquement à la redirection `successUrl` pour confirmer un paiement. L'utilisateur peut fermer son navigateur ou la redirection peut échouer. Utilisez toujours le webhook comme source de vérité.
+</Aside>
+
+## Configuration
+
+<Steps>
+
+1. **Définissez votre Webhook URL** dans les paramètres de votre projet sur le dashboard LawPay.
+
+2. **Créez un endpoint** sur votre serveur qui accepte les requêtes `POST` :
+
+   ```javascript
+   // Express.js example
+   app.post('/webhooks/lawpay', express.json(), (req, res) => {
+     const signature = req.headers['x-lawpay-signature'];
+     const event = req.headers['x-lawpay-event'];
+     const payload = req.body;
+
+     // 1. Vérifiez la signature
+     if (!verifySignature(payload, signature)) {
+       return res.status(401).json({ error: 'Invalid signature' });
+     }
+
+     // 2. Traitez l'événement
+     switch (event) {
+       case 'payment.success':
+         await handlePaymentSuccess(payload);
+         break;
+       case 'payment.cancelled':
+         await handlePaymentCancelled(payload);
+         break;
+     }
+
+     // 3. Répondez avec 200
+     res.json({ received: true });
+   });
+   ```
+
+3. **Vérifiez la signature** pour vous assurer que la requête vient bien de LawPay :
+
+   ```javascript
+   import { createHmac } from 'crypto';
+
+   function verifySignature(payload, receivedSignature) {
+     const apiKey = process.env.LAWPAY_API_KEY;
+     const expected = createHmac('sha256', apiKey)
+       .update(JSON.stringify(payload))
+       .digest('hex');
+     return expected === receivedSignature;
+   }
+   ```
+
+</Steps>
+
+## Format du webhook
+
+### Headers
+
+| Header | Description |
+|--------|-------------|
+| `Content-Type` | `application/json` |
+| `X-LawPay-Signature` | Signature HMAC-SHA256 du body |
+| `X-LawPay-Event` | Type d'événement (`payment.success` ou `payment.cancelled`) |
+
+### Body
+
+```json
+{
+  "event": "payment.success",
+  "transactionId": "550e8400-e29b-41d4-a716-446655440000",
+  "externalOrderId": "order_456",
+  "amount": "15000.00",
+  "currency": "XOF",
+  "status": "paid",
+  "refCommand": "LP-A1B2C3D4",
+  "itemName": "Abonnement Premium",
+  "paymentMethod": "Orange Money",
+  "clientPhone": "+221770001122",
+  "metadata": { "userId": "user_789", "plan": "premium" },
+  "timestamp": "2026-05-19T10:32:15.000Z"
+}
+```
+
+## Bonnes pratiques
+
+- **Répondez rapidement** — Retournez un status `200` dès que possible (dans les 5 secondes). Traitez la logique métier de manière asynchrone si nécessaire.
+- **Gérez l'idempotence** — Un même webhook peut être envoyé plusieurs fois. Utilisez `transactionId` pour dédupliquer.
+- **Vérifiez toujours la signature** — Ne traitez jamais un webhook sans avoir validé `X-LawPay-Signature`.
+- **Utilisez HTTPS** — Votre endpoint webhook doit être accessible en HTTPS.
+
+## Retry
+
+Si votre serveur ne répond pas avec un status `2xx`, LawPay ne retente pas l'envoi automatiquement. Utilisez l'endpoint [Vérifier le statut](/payments/status/) pour réconcilier les transactions manquées.

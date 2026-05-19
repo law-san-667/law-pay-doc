@@ -1,0 +1,83 @@
+---
+title: Quick Start
+description: Create your first payment with the LawPay API in minutes.
+---
+
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Prerequisites
+
+- A LawPay account with an active project
+- Your API keys (API Key and API Secret)
+
+## Steps
+
+<Steps>
+
+1. **Create a project** in your LawPay dashboard and retrieve your `API Key`.
+
+2. **Initialize a payment** by calling the initialization endpoint:
+
+   <Tabs>
+     <TabItem label="cURL">
+     ```bash
+     curl -X POST https://api.lawpay.sn/api/v1/payments/initialize \
+       -H "Content-Type: application/json" \
+       -H "X-API-Key: your_api_key" \
+       -d '{
+         "amount": 5000,
+         "itemName": "Order #123",
+         "orderId": "order_123",
+         "successUrl": "https://yoursite.com/payment/success",
+         "cancelUrl": "https://yoursite.com/payment/failed"
+       }'
+     ```
+     </TabItem>
+     <TabItem label="JavaScript">
+     ```javascript
+     const response = await fetch('https://api.lawpay.sn/api/v1/payments/initialize', {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         'X-API-Key': 'your_api_key',
+       },
+       body: JSON.stringify({
+         amount: 5000,
+         itemName: 'Order #123',
+         orderId: 'order_123',
+         successUrl: 'https://yoursite.com/payment/success',
+         cancelUrl: 'https://yoursite.com/payment/failed',
+       }),
+     });
+
+     const { data } = await response.json();
+     // Redirect user to data.paymentUrl
+     ```
+     </TabItem>
+   </Tabs>
+
+3. **Redirect the user** to the `paymentUrl` returned in the response.
+
+4. **Receive the notification** via your webhook when the payment is completed.
+
+</Steps>
+
+## Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "transactionId": "550e8400-e29b-41d4-a716-446655440000",
+    "refCommand": "LP-A1B2C3D4",
+    "paymentUrl": "https://paytech.sn/payment/checkout/xxxx",
+    "token": "abc123token"
+  }
+}
+```
+
+## Next steps
+
+- [Authentication](/en/guides/authentication/) — Understand API key authentication
+- [Webhooks](/en/webhooks/setup/) — Configure payment notifications
+- [Error codes](/en/reference/errors/) — Complete error reference

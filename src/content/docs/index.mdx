@@ -1,0 +1,31 @@
+---
+title: Documentation API LawPay
+description: Intégrez les paiements en ligne dans votre application avec l'API LawPay.
+template: splash
+hero:
+  tagline: Acceptez les paiements mobile money et carte bancaire en Afrique de l'Ouest via une API simple et sécurisée.
+  actions:
+    - text: Démarrage rapide
+      link: /guides/getting-started/
+      icon: right-arrow
+    - text: Référence API
+      link: /payments/initialize/
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="Intégration rapide" icon="rocket">
+    Créez un projet, obtenez vos clés API et initialisez votre premier paiement en quelques minutes.
+  </Card>
+  <Card title="Webhooks temps réel" icon="puzzle">
+    Recevez des notifications instantanées lorsqu'un paiement est complété ou annulé.
+  </Card>
+  <Card title="Multi-projets" icon="setting">
+    Gérez plusieurs projets avec des clés API indépendantes depuis un seul compte.
+  </Card>
+  <Card title="Sécurisé" icon="approve-check">
+    Signature HMAC sur les webhooks, authentification par clé API, et HTTPS obligatoire.
+  </Card>
+</CardGrid>

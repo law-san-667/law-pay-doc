@@ -1,0 +1,161 @@
+---
+title: Initialiser un paiement
+description: Créez une session de paiement et obtenez un lien de redirection.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+## Endpoint
+
+```http
+POST /api/v1/payments/initialize
+```
+
+**Authentification :** Header `X-API-Key`
+
+## Paramètres du body (JSON)
+
+| Paramètre | Type | Requis | Description |
+|-----------|------|--------|-------------|
+| `amount` | number | ✅ | Montant en XOF (entier, minimum 100) |
+| `itemName` | string | ✅ | Nom de l'article ou description du paiement |
+| `orderId` | string | — | Votre identifiant de commande (pour réconciliation) |
+| `currency` | string | — | Devise (défaut: `"XOF"`) |
+| `customerPhone` | string | — | Numéro de téléphone du client |
+| `customerEmail` | string | — | Email du client |
+| `successUrl` | string | — | URL de redirection après paiement réussi |
+| `cancelUrl` | string | — | URL de redirection après annulation |
+| `metadata` | object | — | Données personnalisées (JSON libre) |
+
+<Aside type="tip">
+  Les `successUrl` et `cancelUrl` sont spécifiques à chaque transaction. Si non fournis, les URLs par défaut du projet sont utilisées.
+</Aside>
+
+## Exemple de requête
+
+<Tabs>
+  <TabItem label="cURL">
+  ```bash
+  curl -X POST https://api.lawpay.sn/api/v1/payments/initialize \
+    -H "Content-Type: application/json" \
+    -H "X-API-Key: lp_live_xxxxxxxxxxxxxxxxxxxx" \
+    -d '{
+      "amount": 15000,
+      "itemName": "Abonnement Premium",
+      "orderId": "order_456",
+      "customerPhone": "+221770001122",
+      "successUrl": "https://monapp.com/paiement/succes?order=456",
+      "cancelUrl": "https://monapp.com/paiement/echec?order=456",
+      "metadata": {
+        "userId": "user_789",
+        "plan": "premium"
+      }
+    }'
+  ```
+  </TabItem>
+  <TabItem label="JavaScript">
+  ```javascript
+  const response = await fetch('https://api.lawpay.sn/api/v1/payments/initialize', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': process.env.LAWPAY_API_KEY,
+    },
+    body: JSON.stringify({
+      amount: 15000,
+      itemName: 'Abonnement Premium',
+      orderId: 'order_456',
+      customerPhone: '+221770001122',
+      successUrl: 'https://monapp.com/paiement/succes?order=456',
+      cancelUrl: 'https://monapp.com/paiement/echec?order=456',
+      metadata: {
+        userId: 'user_789',
+        plan: 'premium',
+      },
+    }),
+  });
+
+  const { success, data } = await response.json();
+
+  if (success) {
+    // Redirigez l'utilisateur vers la page de paiement
+    res.redirect(data.paymentUrl);
+  }
+  ```
+  </TabItem>
+  <TabItem label="PHP">
+  ```php
+  $ch = curl_init('https://api.lawpay.sn/api/v1/payments/initialize');
+  curl_setopt_array($ch, [
+      CURLOPT_POST => true,
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_HTTPHEADER => [
+          'Content-Type: application/json',
+          'X-API-Key: ' . $apiKey,
+      ],
+      CURLOPT_POSTFIELDS => json_encode([
+          'amount' => 15000,
+          'itemName' => 'Abonnement Premium',
+          'orderId' => 'order_456',
+          'successUrl' => 'https://monapp.com/paiement/succes?order=456',
+          'cancelUrl' => 'https://monapp.com/paiement/echec?order=456',
+      ]),
+  ]);
+
+  $response = json_decode(curl_exec($ch), true);
+  curl_close($ch);
+
+  if ($response['success']) {
+      header('Location: ' . $response['data']['paymentUrl']);
+  }
+  ```
+  </TabItem>
+</Tabs>
+
+## Réponse (201 Created)
+
+```json
+{
+  "success": true,
+  "data": {
+    "transactionId": "550e8400-e29b-41d4-a716-446655440000",
+    "refCommand": "LP-A1B2C3D4",
+    "paymentUrl": "https://paytech.sn/payment/checkout/xxxx",
+    "token": "abc123token"
+  }
+}
+```
+
+| Champ | Description |
+|-------|-------------|
+| `transactionId` | Identifiant unique de la transaction (UUID) |
+| `refCommand` | Référence de commande LawPay (format `LP-XXXXXXXX`) |
+| `paymentUrl` | URL vers laquelle rediriger l'utilisateur pour le paiement |
+| `token` | Token PayTech de la session de paiement |
+
+## Erreurs possibles
+
+| Code HTTP | Code erreur | Description |
+|-----------|-------------|-------------|
+| 400 | `VALIDATION` | Paramètres manquants (`amount` et `itemName` requis) |
+| 401 | `AUTH` | Clé API invalide ou manquante |
+| 502 | `PAYMENT_ERROR` | Erreur du fournisseur de paiement |
+
+## Flux de paiement
+
+```
+Votre serveur                    LawPay API                    PayTech
+     |                               |                            |
+     |-- POST /payments/initialize ->|                            |
+     |                               |-- Crée la session -------->|
+     |<-- paymentUrl + token --------|                            |
+     |                               |                            |
+     |  (redirect utilisateur)       |                            |
+     |---------------------------------------------> Page paiement|
+     |                               |                            |
+     |                               |<-- IPN (webhook) ---------|
+     |<-- Webhook notification ------|                            |
+     |                               |                            |
+     |  (utilisateur redirigé)       |                            |
+     |<--------------------------------------------- successUrl   |
+```
