@@ -59,7 +59,7 @@ Toutes les erreurs suivent le même format :
 ## Gestion des erreurs
 
 ```javascript
-const response = await fetch('https://api.lawpay.sn/api/v1/payments/initialize', {
+const response = await fetch('https://law-pay-production.up.railway.app/api/v1/payments/initialize', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',

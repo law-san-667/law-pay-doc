@@ -11,7 +11,7 @@ All requests to the payment API must include your API key in the `X-API-Key` hea
 
 ```http
 POST /api/v1/payments/initialize HTTP/1.1
-Host: api.lawpay.sn
+Host: law-pay-production.up.railway.app
 Content-Type: application/json
 X-API-Key: lp_live_xxxxxxxxxxxxxxxxxxxx
 ```
