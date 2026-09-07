@@ -31,6 +31,13 @@ export default defineConfig({
           ],
         },
         {
+          label: "Marketplace",
+          items: [
+            { slug: "marketplace/overview" },
+            { slug: "marketplace/recipients" },
+          ],
+        },
+        {
           label: "Webhooks",
           items: [{ slug: "webhooks/setup" }, { slug: "webhooks/events" }],
         },

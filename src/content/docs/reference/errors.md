@@ -38,6 +38,29 @@ Toutes les erreurs suivent le même format :
 | Code | HTTP | Message | Solution |
 |------|------|---------|----------|
 | `NOT_FOUND` | 404 | Transaction not found | Vérifiez l'ID de transaction et votre clé API |
+| `NOT_FOUND` | 404 | Recipient not found | Le bénéficiaire n'existe pas dans ce projet |
+| `CONFLICT` | 409 | A recipient with externalId "…" already exists | `externalId` doit être unique par projet |
+
+### Marketplace
+
+| Code | HTTP | Message | Solution |
+|------|------|---------|----------|
+| `MARKETPLACE_DISABLED` | 400 | This project is not in marketplace mode | Activez le mode marketplace dans les paramètres du projet (propriétaire uniquement) |
+| `AMOUNT_TOO_LOW` | 400 | After fees the recipient would receive … | Augmentez `amount` ou réduisez `applicationFee` : le bénéficiaire doit recevoir au moins 100 F |
+| `RECIPIENT_SUSPENDED` | 409 | This recipient is suspended | Réactivez le bénéficiaire (`PATCH { "status": "active" }`) |
+| `NOT_ROUTED` | 409 | This payment has no recipient | `retry-payout` ne s'applique qu'aux paiements reversés |
+| `INVALID_STATE` | 409 | Payout is …; only failed payouts can be retried | Seul un versement en `failed` peut être relancé |
+| `PAYOUT_FAILED` | 502 | *(message de l'opérateur)* | Le transfert a de nouveau échoué ; les fonds restent dans votre solde |
+
+### Remboursements
+
+| Code | HTTP | Message | Solution |
+|------|------|---------|----------|
+| `NOT_REFUNDABLE` | 409 | Only paid transactions can be refunded | Seul un paiement `paid` est remboursable |
+| `ALREADY_REFUNDED` | 409 | This payment has already been refunded | — |
+| `INSUFFICIENT_FUNDS` | 409 | Refunding requires … | Le solde du projet doit couvrir le montant à rembourser |
+| `REFUND_FAILED` | 502 | *(message PayTech)* | PayTech a refusé le remboursement |
+| `RATE_LIMITED` | 429 | Too many requests | Respectez le header `Retry-After` |
 
 ### Paiement
 
@@ -54,6 +77,8 @@ Toutes les erreurs suivent le même format :
 | 400 | Bad Request | Paramètres invalides ou manquants |
 | 401 | Unauthorized | Clé API manquante ou invalide |
 | 404 | Not Found | Ressource introuvable |
+| 409 | Conflict | État incompatible (déjà remboursé, bénéficiaire suspendu, doublon) |
+| 429 | Too Many Requests | Limite de débit atteinte sur un endpoint sensible |
 | 502 | Bad Gateway | Erreur du fournisseur de paiement externe |
 
 ## Gestion des erreurs

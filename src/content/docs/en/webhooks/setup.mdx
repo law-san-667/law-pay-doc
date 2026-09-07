@@ -72,7 +72,7 @@ Webhooks allow LawPay to notify your server in real-time when an event occurs (s
 |--------|-------------|
 | `Content-Type` | `application/json` |
 | `X-LawPay-Signature` | HMAC-SHA256 signature of the body |
-| `X-LawPay-Event` | Event type (`payment.success` or `payment.cancelled`) |
+| `X-LawPay-Event` | Event type — see the [full list](/en/webhooks/events/) (payments, refunds, marketplace payouts, subscriptions) |
 
 ### Body
 
@@ -102,4 +102,17 @@ Webhooks allow LawPay to notify your server in real-time when an event occurs (s
 
 ## Retry
 
-If your server does not respond with a `2xx` status, LawPay does not automatically retry. Use the [Check Status](/en/payments/status/) endpoint to reconcile missed transactions.
+If your server does not answer with a `2xx` status (or not within 10 seconds),
+LawPay **retries automatically** every 15 seconds, up to 40 attempts (about
+10 minutes). After that the delivery is marked failed; you can re-send it from
+the project's **Webhooks** tab, or reconcile with the
+[Check Status](/en/payments/status/) endpoint.
+
+The same event can therefore reach you more than once: handle it idempotently
+(see above).
+
+## One endpoint for everything
+
+Payments, refunds, marketplace payouts and subscriptions all arrive at the same
+URL. There is no second webhook to configure: route on the `X-LawPay-Event`
+header.

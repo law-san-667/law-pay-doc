@@ -1,0 +1,117 @@
+---
+title: Mode marketplace
+description: Reversez chaque paiement directement au commerce concerné, avec votre propre commission.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Pour qui ?
+
+Le mode marketplace s'adresse aux applications où **plusieurs commerces** vendent
+à travers votre plateforme : place de marché, livraison de repas, réservation de
+services, etc. Chaque commerce est enregistré comme **bénéficiaire**, et quand un
+client paie, LawPay lui reverse sa part **immédiatement** par mobile money —
+sans que vous ayez à gérer les retraits vous‑même.
+
+```
+Client paie 10 000 F
+        │
+        ▼
+   Compte PayTech LawPay
+        │
+        ├── 50 F   → frais LawPay (0,5 %)
+        ├── 500 F  → votre commission (applicationFee) → reste dans votre solde
+        └── 9 450 F → versé au bénéficiaire par mobile money
+```
+
+## Activer le mode
+
+<Steps>
+
+1. Dans le dashboard, ouvrez votre projet → **Paramètres** → **Mode de versement**
+   et choisissez **Marketplace**. Seul le propriétaire du projet peut le faire.
+
+2. Enregistrez vos bénéficiaires, depuis l'onglet **Bénéficiaires** du projet ou
+   par l'[API](/marketplace/recipients/).
+
+3. À l'initialisation d'un paiement, indiquez le bénéficiaire avec `recipientId`
+   ou `recipientExternalId`, et votre commission avec `applicationFee`.
+
+</Steps>
+
+<Aside type="note">
+  Un projet en mode marketplace peut toujours encaisser des paiements
+  « classiques » : il suffit de ne pas indiquer de bénéficiaire. Ces fonds
+  restent dans votre solde comme d'habitude.
+</Aside>
+
+## Frais
+
+| | Paiement standard | Paiement reversé (marketplace) |
+|---|---|---|
+| Frais LawPay | `fee_percent` (défaut 0,25 %) | `marketplace_fee_percent` (défaut 0,5 %, car encaissement **et** transfert) |
+| Minimum | 10 F par paiement | 10 F par paiement |
+| Votre commission | — | `applicationFee`, libre, conservée dans votre solde |
+| Le bénéficiaire reçoit | — | `amount − frais LawPay − applicationFee` |
+
+Le frais est `max(minimum, montant × taux)` : sur un paiement de 2 000 F,
+0,25 % donnerait 5 F, c'est donc le minimum de 10 F qui s'applique. Les taux
+exacts appliqués à votre projet sont visibles dans ses paramètres. Les frais sont **figés à l'initialisation** du paiement : une
+modification de tarif ultérieure ne change pas ce qu'un paiement déjà créé coûte.
+
+<Aside type="caution" title="Montant minimum">
+  Après déduction des frais et de votre commission, le bénéficiaire doit recevoir
+  au moins **100 F**. Sinon l'initialisation est refusée avec `AMOUNT_TOO_LOW`,
+  et la réponse détaille le calcul.
+</Aside>
+
+## Cycle de vie d'un versement
+
+| `payoutStatus` | Signification |
+|---|---|
+| `pending` | Paiement créé, client pas encore passé à la caisse |
+| `processing` | Client a payé, transfert mobile money en cours |
+| `success` | Le bénéficiaire a reçu les fonds |
+| `failed` | Le transfert a échoué — les fonds sont revenus dans votre solde |
+
+Vous êtes notifié par webhook à chaque étape : `payment.success` (avec
+`payoutStatus`), puis `payout.success` ou `payout.failed`. Voir
+[Événements webhook](/webhooks/events/).
+
+### Échecs et relances
+
+Un transfert peut échouer pour une raison passagère (indisponibilité de
+l'opérateur, plafond atteint). Dans ce cas :
+
+- Les fonds reviennent **automatiquement** dans le solde de votre projet ;
+  rien n'est perdu.
+- LawPay **réessaie de lui‑même** jusqu'à 3 fois, à 30 minutes d'intervalle.
+- Vous pouvez relancer manuellement via
+  `POST /api/v1/payments/:id/retry-payout` ou le bouton **Relancer le versement**
+  dans le dashboard.
+
+Si le bénéficiaire est **suspendu**, le versement échoue immédiatement et n'est
+pas réessayé. Réactivez‑le puis relancez.
+
+## Remboursements
+
+Un paiement reversé peut être remboursé, mais uniquement si votre solde couvre
+le montant total : l'argent est déjà parti chez le bénéficiaire. Prévoyez soit
+une réserve dans votre solde, soit une procédure de récupération auprès du
+commerce concerné.
+
+## Un seul webhook suffit
+
+Les événements de versement arrivent sur **la même URL** que les événements de
+paiement. Distinguez‑les avec le header `X-LawPay-Event` ou le champ `event` du
+body — aucun second endpoint à configurer.
+
+## Sécurité
+
+- Le mode marketplace et le numéro de versement d'un bénéficiaire ne peuvent
+  être modifiés depuis le dashboard que par le **propriétaire** du projet.
+- Tout changement de numéro de versement est consigné dans le journal d'audit
+  du projet et déclenche un événement `recipient.updated`, pour que vos
+  systèmes puissent le détecter.
+- Gardez votre clé API secrète : elle permet de créer et modifier des
+  bénéficiaires. Régénérez‑la immédiatement en cas de doute.

@@ -1,0 +1,130 @@
+---
+title: Recipients
+description: Manage the businesses that receive routed payments.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+A recipient is a business on your marketplace, identified by the mobile money
+number LawPay pays routed payments to.
+
+**Authentication:** `X-API-Key` header. The project must be in
+[marketplace mode](/en/marketplace/overview/).
+
+## Create a recipient
+
+```http
+POST /api/v1/recipients
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | ✅ | Business name |
+| `destinationNumber` | string | ✅ | Mobile money number that receives payouts |
+| `service` | string | ✅ | Operator: `"Orange Money Senegal"`, `"Wave Senegal"`, `"Free Money Senegal"`, `"Expresso Senegal"` |
+| `externalId` | string | — | Your own id for the business, unique per project. Lets you route a payment with `recipientExternalId` without storing the LawPay id |
+| `email` | string | — | Business contact |
+| `phone` | string | — | Business contact |
+| `metadata` | object | — | Free-form data |
+
+<Tabs>
+  <TabItem label="cURL">
+  ```bash
+  curl -X POST https://law-pay-production.up.railway.app/api/v1/recipients \
+    -H "Content-Type: application/json" \
+    -H "X-API-Key: lp_live_xxxxxxxxxxxxxxxxxxxx" \
+    -d '{
+      "name": "Awa Shop",
+      "externalId": "shop_42",
+      "destinationNumber": "770000000",
+      "service": "Wave Senegal"
+    }'
+  ```
+  </TabItem>
+  <TabItem label="JavaScript">
+  ```javascript
+  const res = await fetch('https://law-pay-production.up.railway.app/api/v1/recipients', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': process.env.LAWPAY_API_KEY },
+    body: JSON.stringify({
+      name: 'Awa Shop',
+      externalId: 'shop_42',
+      destinationNumber: '770000000',
+      service: 'Wave Senegal',
+    }),
+  });
+  const { data: recipient } = await res.json();
+  ```
+  </TabItem>
+</Tabs>
+
+### Response (201 Created)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "name": "Awa Shop",
+    "external_id": "shop_42",
+    "destination_number": "770000000",
+    "service": "Wave Senegal",
+    "email": null,
+    "phone": null,
+    "status": "active",
+    "metadata": null,
+    "created_at": "2026-09-07T10:00:00.000Z",
+    "updated_at": "2026-09-07T10:00:00.000Z"
+  }
+}
+```
+
+## List recipients
+
+```http
+GET /api/v1/recipients?status=active&limit=50&offset=0
+```
+
+Returns `{ recipients, total, limit, offset }`.
+
+## Get a recipient
+
+```http
+GET /api/v1/recipients/:id
+```
+
+Includes a `stats` object: `paid_count`, `total_paid_out`, `failed_payouts`.
+
+## Update a recipient
+
+```http
+PATCH /api/v1/recipients/:id
+```
+
+All fields optional: `name`, `destinationNumber`, `service`, `email`, `phone`,
+`status` (`active` | `suspended`), `metadata`.
+
+<Aside type="caution">
+  Changing `destinationNumber` or `service` redirects the business's money. It
+  is written to the project's audit log and emits a `recipient.updated` webhook
+  with `destinationChanged: true`. Watch for that event.
+</Aside>
+
+## Suspend a recipient
+
+```http
+DELETE /api/v1/recipients/:id
+```
+
+The recipient becomes `suspended`: existing payments remain visible, but no new
+payment can be routed to them (`RECIPIENT_SUSPENDED`) and failed payouts are no
+longer retried. Reactivate with `PATCH { "status": "active" }`.
+
+## Errors
+
+| HTTP | Code | When |
+|------|------|------|
+| 400 | `MARKETPLACE_DISABLED` | The project is not in marketplace mode |
+| 400 | `VALIDATION` | Missing required field or invalid `status` |
+| 404 | `NOT_FOUND` | Unknown recipient for this project |
+| 409 | `CONFLICT` | `externalId` already used in this project |

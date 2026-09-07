@@ -1,0 +1,113 @@
+---
+title: Marketplace mode
+description: Pay each seller out directly on every payment, keeping your own commission.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Who it's for
+
+Marketplace mode is for applications where **several businesses** sell through
+your platform: marketplaces, food delivery, service booking, and so on. Each
+business is registered as a **recipient**, and when a customer pays, LawPay
+sends them their share **immediately** by mobile money — you never have to
+manage withdrawals on their behalf.
+
+```
+Customer pays 10,000 F
+        │
+        ▼
+   LawPay PayTech account
+        │
+        ├── 50 F   → LawPay fee (0.5%)
+        ├── 500 F  → your commission (applicationFee) → stays in your balance
+        └── 9,450 F → paid out to the recipient by mobile money
+```
+
+## Enabling it
+
+<Steps>
+
+1. In the dashboard, open your project → **Settings** → **Payout mode** and
+   pick **Marketplace**. Only the project owner can do this.
+
+2. Register your recipients, from the project's **Recipients** tab or through
+   the [API](/en/marketplace/recipients/).
+
+3. When initializing a payment, name the recipient with `recipientId` or
+   `recipientExternalId`, and your commission with `applicationFee`.
+
+</Steps>
+
+<Aside type="note">
+  A marketplace project can still take ordinary payments: simply omit the
+  recipient. Those funds stay in your balance as usual.
+</Aside>
+
+## Fees
+
+| | Standard payment | Routed payment (marketplace) |
+|---|---|---|
+| LawPay fee | `fee_percent` (default 0.25%) | `marketplace_fee_percent` (default 0.5%, as it covers a collection **and** a transfer) |
+| Minimum | 10 F per payment | 10 F per payment |
+| Your commission | — | `applicationFee`, any amount, kept in your balance |
+| Recipient receives | — | `amount − LawPay fee − applicationFee` |
+
+The fee is `max(minimum, amount × rate)`: on a 2,000 F payment, 0.25% would be
+5 F, so the 10 F minimum applies instead. The exact rates for your project are
+shown in its settings. Fees are **locked
+at initialization**: a later rate change never alters what an existing payment
+costs.
+
+<Aside type="caution" title="Minimum amount">
+  After fees and your commission, the recipient must receive at least **100 F**.
+  Otherwise initialization is refused with `AMOUNT_TOO_LOW`, and the response
+  spells out the calculation.
+</Aside>
+
+## Payout lifecycle
+
+| `payoutStatus` | Meaning |
+|---|---|
+| `pending` | Payment created, customer has not paid yet |
+| `processing` | Customer paid, mobile money transfer in progress |
+| `success` | The recipient received the funds |
+| `failed` | The transfer failed — funds returned to your balance |
+
+You are notified by webhook at every step: `payment.success` (carrying
+`payoutStatus`), then `payout.success` or `payout.failed`. See
+[Webhook events](/en/webhooks/events/).
+
+### Failures and retries
+
+A transfer can fail for a transient reason (operator outage, limit reached).
+When it does:
+
+- The funds go **back into your project balance automatically**; nothing is lost.
+- LawPay **retries on its own** up to 3 times, 30 minutes apart.
+- You can retry manually with `POST /api/v1/payments/:id/retry-payout` or the
+  **Retry payout** button in the dashboard.
+
+If the recipient is **suspended**, the payout fails immediately and is not
+retried. Reactivate them, then retry.
+
+## Refunds
+
+A routed payment can be refunded, but only if your balance covers the full
+amount: the money has already gone to the recipient. Keep a reserve in your
+balance, or have a process for recovering it from the business.
+
+## One webhook is enough
+
+Payout events arrive at **the same URL** as payment events. Tell them apart with
+the `X-LawPay-Event` header or the `event` field in the body — there is no
+second endpoint to set up.
+
+## Security
+
+- Marketplace mode and a recipient's payout number can only be changed from the
+  dashboard by the project **owner**.
+- Every payout-number change is written to the project's audit log and emits a
+  `recipient.updated` event, so your own systems can detect it.
+- Keep your API key secret: it can create and modify recipients. Regenerate it
+  immediately if in doubt.

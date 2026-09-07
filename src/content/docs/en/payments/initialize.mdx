@@ -26,6 +26,16 @@ POST /api/v1/payments/initialize
 | `successUrl` | string | — | Redirect URL after successful payment |
 | `cancelUrl` | string | — | Redirect URL after cancellation |
 | `metadata` | object | — | Custom data (free-form JSON) |
+| `recipientId` | string | — | **Marketplace.** Recipient (LawPay id) this payment is paid out to |
+| `recipientExternalId` | string | — | **Marketplace.** Same, using your own id for the business |
+| `applicationFee` | number | — | **Marketplace.** Your commission in XOF, kept in your balance (default `0`) |
+
+<Aside type="note" title="Marketplace mode">
+  `recipientId` / `recipientExternalId` and `applicationFee` are only accepted
+  when the project is in [marketplace mode](/en/marketplace/overview/). The
+  recipient then receives `amount − LawPay fee − applicationFee` as soon as the
+  customer has paid.
+</Aside>
 
 <Aside type="tip">
   `successUrl` and `cancelUrl` are specific to each transaction. If not provided, your project's default URLs are used.
@@ -132,12 +142,38 @@ POST /api/v1/payments/initialize
 | `refCommand` | LawPay order reference (format `LP-XXXXXXXX`) |
 | `paymentUrl` | URL to redirect the user for payment |
 | `token` | PayTech payment session token |
+| `recipient` | *(marketplace)* `{ id, externalId, name }` of the recipient |
+| `fees` | *(marketplace)* `{ platformFee, applicationFee, netToRecipient }` — the breakdown locked at initialization |
+
+### Marketplace response example
+
+```json
+{
+  "success": true,
+  "data": {
+    "transactionId": "550e8400-e29b-41d4-a716-446655440000",
+    "refCommand": "LP-A1B2C3D4",
+    "paymentUrl": "https://paytech.sn/payment/checkout/xxxx",
+    "token": "abc123token",
+    "recipient": { "id": "7c9e6679-…", "externalId": "shop_42", "name": "Awa Shop" },
+    "fees": { "platformFee": 50, "applicationFee": 500, "netToRecipient": 9450 }
+  }
+}
+```
 
 ## Possible errors
 
 | HTTP Code | Error Code | Description |
 |-----------|------------|-------------|
 | 400 | `VALIDATION` | Missing parameters (`amount` and `itemName` required) |
+| 400 | `MARKETPLACE_DISABLED` | A recipient was given but the project is not in marketplace mode |
+| 400 | `AMOUNT_TOO_LOW` | After fees and commission the recipient would receive less than 100 F |
+| 404 | `NOT_FOUND` | Unknown recipient |
+| 409 | `RECIPIENT_SUSPENDED` | The recipient is suspended |
+| 400 | `MARKETPLACE_DISABLED` | A recipient was given but the project is not in marketplace mode |
+| 400 | `AMOUNT_TOO_LOW` | After fees and commission the recipient would receive less than 100 F |
+| 404 | `NOT_FOUND` | Unknown recipient |
+| 409 | `RECIPIENT_SUSPENDED` | The recipient is suspended |
 | 401 | `AUTH` | Invalid or missing API key |
 | 502 | `PAYMENT_ERROR` | Payment provider error |
 

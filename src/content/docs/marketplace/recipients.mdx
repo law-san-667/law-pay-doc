@@ -1,0 +1,132 @@
+---
+title: Bénéficiaires
+description: Gérez les commerces qui reçoivent les paiements reversés.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+Un bénéficiaire est un commerce de votre marketplace, identifié par un numéro
+mobile money vers lequel LawPay reverse les paiements qui lui sont destinés.
+
+**Authentification :** header `X-API-Key`. Le projet doit être en
+[mode marketplace](/marketplace/overview/).
+
+## Créer un bénéficiaire
+
+```http
+POST /api/v1/recipients
+```
+
+| Paramètre | Type | Requis | Description |
+|-----------|------|--------|-------------|
+| `name` | string | ✅ | Nom du commerce |
+| `destinationNumber` | string | ✅ | Numéro mobile money qui reçoit les versements |
+| `service` | string | ✅ | Opérateur : `"Orange Money Senegal"`, `"Wave Senegal"`, `"Free Money Senegal"`, `"Expresso Senegal"` |
+| `externalId` | string | — | Votre propre identifiant du commerce, unique par projet. Permet de router un paiement avec `recipientExternalId` sans stocker l'id LawPay |
+| `email` | string | — | Contact du commerce |
+| `phone` | string | — | Contact du commerce |
+| `metadata` | object | — | Données libres |
+
+<Tabs>
+  <TabItem label="cURL">
+  ```bash
+  curl -X POST https://law-pay-production.up.railway.app/api/v1/recipients \
+    -H "Content-Type: application/json" \
+    -H "X-API-Key: lp_live_xxxxxxxxxxxxxxxxxxxx" \
+    -d '{
+      "name": "Boutique Awa",
+      "externalId": "shop_42",
+      "destinationNumber": "770000000",
+      "service": "Wave Senegal"
+    }'
+  ```
+  </TabItem>
+  <TabItem label="JavaScript">
+  ```javascript
+  const res = await fetch('https://law-pay-production.up.railway.app/api/v1/recipients', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': process.env.LAWPAY_API_KEY },
+    body: JSON.stringify({
+      name: 'Boutique Awa',
+      externalId: 'shop_42',
+      destinationNumber: '770000000',
+      service: 'Wave Senegal',
+    }),
+  });
+  const { data: recipient } = await res.json();
+  ```
+  </TabItem>
+</Tabs>
+
+### Réponse (201 Created)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "name": "Boutique Awa",
+    "external_id": "shop_42",
+    "destination_number": "770000000",
+    "service": "Wave Senegal",
+    "email": null,
+    "phone": null,
+    "status": "active",
+    "metadata": null,
+    "created_at": "2026-09-07T10:00:00.000Z",
+    "updated_at": "2026-09-07T10:00:00.000Z"
+  }
+}
+```
+
+## Lister les bénéficiaires
+
+```http
+GET /api/v1/recipients?status=active&limit=50&offset=0
+```
+
+Retourne `{ recipients, total, limit, offset }`.
+
+## Consulter un bénéficiaire
+
+```http
+GET /api/v1/recipients/:id
+```
+
+Inclut un objet `stats` : `paid_count`, `total_paid_out`, `failed_payouts`.
+
+## Modifier un bénéficiaire
+
+```http
+PATCH /api/v1/recipients/:id
+```
+
+Tous les champs sont optionnels : `name`, `destinationNumber`, `service`,
+`email`, `phone`, `status` (`active` | `suspended`), `metadata`.
+
+<Aside type="caution">
+  Un changement de `destinationNumber` ou de `service` redirige l'argent du
+  commerce. Il est consigné dans le journal d'audit du projet et déclenche un
+  webhook `recipient.updated` avec `destinationChanged: true`. Surveillez cet
+  événement.
+</Aside>
+
+## Suspendre un bénéficiaire
+
+```http
+DELETE /api/v1/recipients/:id
+```
+
+Le bénéficiaire passe en `suspended` : les paiements existants restent
+consultables, mais aucun nouveau paiement ne peut lui être destiné
+(`RECIPIENT_SUSPENDED`) et les versements en échec ne sont plus réessayés.
+Réactivez‑le avec `PATCH { "status": "active" }`.
+
+## Erreurs
+
+| HTTP | Code | Quand |
+|------|------|-------|
+| 400 | `MARKETPLACE_DISABLED` | Le projet n'est pas en mode marketplace |
+| 400 | `VALIDATION` | Champ requis manquant ou `status` invalide |
+| 404 | `NOT_FOUND` | Bénéficiaire inconnu pour ce projet |
+| 409 | `CONFLICT` | `externalId` déjà utilisé dans ce projet |

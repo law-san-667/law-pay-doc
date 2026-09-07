@@ -26,6 +26,15 @@ POST /api/v1/payments/initialize
 | `successUrl` | string | — | URL de redirection après paiement réussi |
 | `cancelUrl` | string | — | URL de redirection après annulation |
 | `metadata` | object | — | Données personnalisées (JSON libre) |
+| `recipientId` | string | — | **Marketplace.** Bénéficiaire (id LawPay) à qui reverser ce paiement |
+| `recipientExternalId` | string | — | **Marketplace.** Même chose, avec votre propre identifiant du commerce |
+| `applicationFee` | number | — | **Marketplace.** Votre commission en XOF, conservée dans votre solde (défaut `0`) |
+
+<Aside type="note" title="Mode marketplace">
+  `recipientId` / `recipientExternalId` et `applicationFee` ne sont acceptés que
+  si le projet est en [mode marketplace](/marketplace/overview/). Le bénéficiaire
+  reçoit alors `amount − frais LawPay − applicationFee` dès que le client a payé.
+</Aside>
 
 <Aside type="tip">
   Les `successUrl` et `cancelUrl` sont spécifiques à chaque transaction. Si non fournis, les URLs par défaut du projet sont utilisées.
@@ -132,12 +141,34 @@ POST /api/v1/payments/initialize
 | `refCommand` | Référence de commande LawPay (format `LP-XXXXXXXX`) |
 | `paymentUrl` | URL vers laquelle rediriger l'utilisateur pour le paiement |
 | `token` | Token PayTech de la session de paiement |
+| `recipient` | *(marketplace)* `{ id, externalId, name }` du bénéficiaire |
+| `fees` | *(marketplace)* `{ platformFee, applicationFee, netToRecipient }` — le détail figé à l'initialisation |
+
+### Exemple de réponse marketplace
+
+```json
+{
+  "success": true,
+  "data": {
+    "transactionId": "550e8400-e29b-41d4-a716-446655440000",
+    "refCommand": "LP-A1B2C3D4",
+    "paymentUrl": "https://paytech.sn/payment/checkout/xxxx",
+    "token": "abc123token",
+    "recipient": { "id": "7c9e6679-…", "externalId": "shop_42", "name": "Boutique Awa" },
+    "fees": { "platformFee": 50, "applicationFee": 500, "netToRecipient": 9450 }
+  }
+}
+```
 
 ## Erreurs possibles
 
 | Code HTTP | Code erreur | Description |
 |-----------|-------------|-------------|
 | 400 | `VALIDATION` | Paramètres manquants (`amount` et `itemName` requis) |
+| 400 | `MARKETPLACE_DISABLED` | Bénéficiaire indiqué sur un projet qui n'est pas en mode marketplace |
+| 400 | `AMOUNT_TOO_LOW` | Après frais et commission, le bénéficiaire recevrait moins de 100 F |
+| 404 | `NOT_FOUND` | Bénéficiaire inconnu |
+| 409 | `RECIPIENT_SUSPENDED` | Le bénéficiaire est suspendu |
 | 401 | `AUTH` | Clé API invalide ou manquante |
 | 502 | `PAYMENT_ERROR` | Erreur du fournisseur de paiement |
 

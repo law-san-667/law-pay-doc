@@ -38,6 +38,29 @@ All errors follow the same format:
 | Code | HTTP | Message | Solution |
 |------|------|---------|----------|
 | `NOT_FOUND` | 404 | Transaction not found | Check the transaction ID and your API key |
+| `NOT_FOUND` | 404 | Recipient not found | The recipient does not exist in this project |
+| `CONFLICT` | 409 | A recipient with externalId "…" already exists | `externalId` must be unique per project |
+
+### Marketplace
+
+| Code | HTTP | Message | Solution |
+|------|------|---------|----------|
+| `MARKETPLACE_DISABLED` | 400 | This project is not in marketplace mode | Enable marketplace mode in the project settings (owner only) |
+| `AMOUNT_TOO_LOW` | 400 | After fees the recipient would receive … | Raise `amount` or lower `applicationFee`: the recipient must receive at least 100 F |
+| `RECIPIENT_SUSPENDED` | 409 | This recipient is suspended | Reactivate the recipient (`PATCH { "status": "active" }`) |
+| `NOT_ROUTED` | 409 | This payment has no recipient | `retry-payout` only applies to routed payments |
+| `INVALID_STATE` | 409 | Payout is …; only failed payouts can be retried | Only a `failed` payout can be retried |
+| `PAYOUT_FAILED` | 502 | *(operator message)* | The transfer failed again; funds remain in your balance |
+
+### Refunds
+
+| Code | HTTP | Message | Solution |
+|------|------|---------|----------|
+| `NOT_REFUNDABLE` | 409 | Only paid transactions can be refunded | Only a `paid` payment can be refunded |
+| `ALREADY_REFUNDED` | 409 | This payment has already been refunded | — |
+| `INSUFFICIENT_FUNDS` | 409 | Refunding requires … | The project balance must cover the refund |
+| `REFUND_FAILED` | 502 | *(PayTech message)* | PayTech rejected the refund |
+| `RATE_LIMITED` | 429 | Too many requests | Honour the `Retry-After` header |
 
 ### Payment
 
@@ -54,6 +77,8 @@ All errors follow the same format:
 | 400 | Bad Request | Invalid or missing parameters |
 | 401 | Unauthorized | Missing or invalid API key |
 | 404 | Not Found | Resource not found |
+| 409 | Conflict | Incompatible state (already refunded, suspended recipient, duplicate) |
+| 429 | Too Many Requests | Rate limit reached on a sensitive endpoint |
 | 502 | Bad Gateway | External payment provider error |
 
 ## Error handling
